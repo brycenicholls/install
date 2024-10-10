@@ -157,7 +157,15 @@ check_symlinks() {
     }
   fi
 }
-
+# Function to ensure the $VENV_DIR exists, create if it doesn't
+ensure_config_dir() {
+  if [ ! -d "$CONFIG_DIR" ]; then
+    echo "Creating $CONFIG_DIR..."
+    mkdir -p "$CONFIG_DIR" && echo "$CONFIG_DIR created." || echo "Failed to create $CONFIG_DIR."
+  else
+    echo "$CONFIG_DIR already exists."
+  fi
+}
 # Function to ensure the $VENV_DIR exists, create if it doesn't
 ensure_venv_dir() {
   if [ ! -d "$VENV_DIR" ]; then
@@ -176,6 +184,7 @@ update_homebrew
 install_packages "formulae" formulae[@]
 install_packages "casks" casks[@]
 cleanup_homebrew
+ensure_config_dir
 ensure_venv_dir
 check_symlinks
 create_ssh_key_if_not_exists
