@@ -6,8 +6,34 @@ SSH_KEY_PATH="$HOME/.ssh/id_ed25519" # ED25519 SSH key path
 VENV_DIR="$HOME/venvs"
 REPO_URL="git@github.com:brycenicholls/dots.git"
 REPO_DIR="$HOME/dots"
-# Arrays of packages to install
-formulae=(
+
+# Default computer type
+USE_CASE=""
+
+# Parse command line options
+while getopts ":wh" opt; do
+  case $opt in
+  w)
+    USE_CASE="work"
+    ;;
+  h)
+    USE_CASE="home"
+    ;;
+  *)
+    echo "Usage: $0 -w (for work) or -h (for home)"
+    exit 1
+    ;;
+  esac
+done
+
+# Check if USE_CASE is set
+if [ -z "$USE_CASE" ]; then
+  echo "No use case specified. Use -w for work or -h for home."
+  exit 1
+fi
+
+# Common array of packages
+common_formulae=(
   ansible-language-server
   ansible-lint
   bat
@@ -27,18 +53,49 @@ formulae=(
   tree
   tree-sitter
   wget
-  yt-dlp
   zsh-autosuggestions
   zsh-syntax-highlighting
 )
 
-casks=(
-  utm
+# Additional packages based on USE_CASE
+case $USE_CASE in
+work)
+  additional_formulae=(
+    google-chrome
+    teleport
+  )
+  ;;
+home)
+  additional_formulae=(
+    yt-dlp
+    firefox
+  )
+  ;;
+esac
+
+# Merged array of formulae
+formulae=("${common_formulae[@]}" "${additional_formulae[@]}")
+
+# Array of casks (common for both types)
+common_casks=(
   font-jetbrains-mono-nerd-font
   obsidian
   spotify
-  wezterm
 )
+
+case $USE_CASE in
+work)
+  additional_casks=(
+    iterm2
+  )
+  ;;
+home)
+  additional_casks=(
+    utm
+    wezterm
+  )
+  ;;
+esac
 
 # Array of symlinks to check
 symlinks=(
@@ -140,10 +197,10 @@ check_symlinks() {
 
     # Download the repository
     echo "Downloading the repository from $REPO_URL..."
-    git clone "$REPO_URL" "$REPO_DIR" || {
+    if ! git clone "$REPO_URL" "$REPO_DIR"; then
       echo "Failed to clone the repository. Exiting."
       exit 1
-    }
+    fi
 
     # Change to the repository directory and run the stow command
     cd "$REPO_DIR" || {
@@ -157,7 +214,8 @@ check_symlinks() {
     }
   fi
 }
-# Function to ensure the $VENV_DIR exists, create if it doesn't
+
+# Function to ensure the $CONFIG_DIR exists, create if it doesn't
 ensure_config_dir() {
   if [ ! -d "$CONFIG_DIR" ]; then
     echo "Creating $CONFIG_DIR..."
@@ -166,6 +224,7 @@ ensure_config_dir() {
     echo "$CONFIG_DIR already exists."
   fi
 }
+
 # Function to ensure the $VENV_DIR exists, create if it doesn't
 ensure_venv_dir() {
   if [ ! -d "$VENV_DIR" ]; then
@@ -176,17 +235,56 @@ ensure_venv_dir() {
   fi
 }
 
+# Function to configure iTerm2 preferences
+configure_iterm2_preferences() {
+  if [[ "$(uname)" == "Darwin" ]]; then
+    echo "Configuring iTerm2 preferences..."
+    curl -o "$HOME/Library/Preferences/com.googlecode.iterm2.plist" https://raw.githubusercontent.com/nordtheme/iterm2/refs/heads/develop/src/xml/Nord.itermcolors
+    echo "iTerm2 preferences configured."
+  else
+    echo "This script only runs on macOS."
+  fi
+}
+
+import_iterm_profile() {
+  # Path to your profile JSON file
+  local profile_json_path="$HOME/path/to/your/profile.json"
+
+  # Check if the profile JSON file exists
+  if [[ ! -f "$profile_json_path" ]]; then
+    echo "Profile JSON file not found at: $profile_json_path"
+    return 1
+  fi
+
+  # Import the profile using osascript
+  osascript <<EOF
+tell application "iTerm2"
+    set profilePath to POSIX file "$profile_json_path"
+    set importedProfiles to (import profile profilePath)
+    repeat with p in importedProfiles
+        if name of p is "Your Profile Name" then -- Change this to your actual profile name
+            set default profile to p
+        end if
+    end repeat
+end tell
+EOF
+
+  echo "Profile imported and set to default."
+}
+
 # Main script execution
 echo "Starting setup process..."
 
 install_homebrew
 update_homebrew
 install_packages "formulae" formulae[@]
-install_packages "casks" casks[@]
+install_packages "casks" additional_casks[@]
 cleanup_homebrew
 ensure_config_dir
 ensure_venv_dir
 check_symlinks
 create_ssh_key_if_not_exists
+configure_iterm2_preferences
+import_iterm_profile
 
 echo "Setup complete!"
