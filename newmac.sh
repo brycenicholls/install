@@ -96,6 +96,7 @@ case $USE_CASE in
 work)
   additional_casks=(
     iterm2
+    slack
   )
   ;;
 home)
